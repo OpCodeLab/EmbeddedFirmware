@@ -56,6 +56,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 
+void SendAccelFrame(int16_t x_mg, int16_t y_mg);
+uint8_t SendFrame(FrameUART *frame );
 
 /**
  * @brief  The application entry point.
@@ -97,45 +99,8 @@ int main(void)
 		BSP_ACCELERO_GetXYZ(Buffer);
 		Xval=Buffer[0];
 		Yval=Buffer[1];
-		if (abs(Xval) > 200)
-		{
-			if (Xval>0)
-			{
-				BSP_LED_On(LED5);
-				BSP_LED_Off(LED4);
-			}
-			else
-			{
-				BSP_LED_Off(LED5);
-				BSP_LED_On(LED4);
-			}
-		}
-		else
-		{
-			BSP_LED_Off(LED4);
-			BSP_LED_Off(LED5);
-		}
-		if (abs(Yval) > 200)
-		{
-			if (Yval>0)
-			{
-				BSP_LED_On(LED3);
-				BSP_LED_Off(LED6);
-			}
-			else
-			{
-				BSP_LED_Off(LED3);
-				BSP_LED_On(LED6);
-			}
-		}
-		else
-		{
-			BSP_LED_Off(LED3);
-			BSP_LED_Off(LED6);
-		}
-
-
-
+        HAL_Delay(50);
+        SendAccelFrame(Xval,Yval);
 	}
 
 	/* USER CODE END 3 */
@@ -256,6 +221,19 @@ void ExecuteReceivedFrameCallback(FrameUART *frame)
 
 }
 
+#define COMMAND_ACCEL   0xA1     /* STM32 → PC: accelero frame   */
+
+
+void SendAccelFrame(int16_t x_mg, int16_t y_mg)
+{
+    FrameUART f;
+    f.cmd    = COMMAND_ACCEL;
+    f.config = 0x0000;
+    /* Pack: DATA[31:16] = Xval,  DATA[15:0] = Yval  (both as uint16) */
+    f.data   = ((uint32_t)(uint16_t)x_mg << 16) | ((uint32_t)(uint16_t)y_mg & 0xFFFF);
+    SendFrame(&f);
+}
+
 uint8_t SendFrame(FrameUART *frame )
 {
 	uint8_t err=0;
@@ -317,78 +295,6 @@ void SystemClock_Config(void)
 	{
 		Error_Handler();
 	}
-}
-
-/**
- * @brief I2C1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_I2C1_Init(void)
-{
-
-	/* USER CODE BEGIN I2C1_Init 0 */
-
-	/* USER CODE END I2C1_Init 0 */
-
-	/* USER CODE BEGIN I2C1_Init 1 */
-
-	/* USER CODE END I2C1_Init 1 */
-	hi2c1.Instance = I2C1;
-	hi2c1.Init.ClockSpeed = 100000;
-	hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-	hi2c1.Init.OwnAddress1 = 0;
-	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-	hi2c1.Init.OwnAddress2 = 0;
-	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN I2C1_Init 2 */
-
-	/* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
- * @brief SPI1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_SPI1_Init(void)
-{
-
-	/* USER CODE BEGIN SPI1_Init 0 */
-
-	/* USER CODE END SPI1_Init 0 */
-
-	/* USER CODE BEGIN SPI1_Init 1 */
-
-	/* USER CODE END SPI1_Init 1 */
-	/* SPI1 parameter configuration*/
-	hspi1.Instance = SPI1;
-	hspi1.Init.Mode = SPI_MODE_MASTER;
-	hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-	hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-	hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-	hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-	hspi1.Init.NSS = SPI_NSS_SOFT;
-	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-	hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-	hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-	hspi1.Init.CRCPolynomial = 10;
-	if (HAL_SPI_Init(&hspi1) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	/* USER CODE BEGIN SPI1_Init 2 */
-
-	/* USER CODE END SPI1_Init 2 */
-
 }
 
 /**
@@ -469,6 +375,11 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+
+	/* EXTI interrupt init*/
+    HAL_NVIC_SetPriority(EXTI0_IRQn, 4, 0);
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 	/*Configure GPIO pins : PD12 PD13 PD14 PD15 */
 	GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -476,9 +387,6 @@ static void MX_GPIO_Init(void)
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-	/* USER CODE BEGIN MX_GPIO_Init_2 */
-
-	/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
