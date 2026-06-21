@@ -249,7 +249,7 @@ uint8_t SendFrame(FrameUART *frame )
 	Txbuffer[6]=(uint8_t)(frame->data>>16);
 	Txbuffer[7]=(uint8_t)(frame->data>>24);
 
-    HAL_UART_Transmit_IT(&huart2,Txbuffer,8);
+    HAL_UART_Transmit(&huart2,Txbuffer,8,50);
 
 	return err;
 

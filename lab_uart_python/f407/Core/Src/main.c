@@ -44,6 +44,8 @@ typedef struct
 /*Callback Function */
 void ExecuteReceivedFrameCallback(FrameUART *frame);
 
+void SendAccelFrame(int16_t x_mg, int16_t y_mg);
+uint8_t SendFrame(FrameUART *frame );
 
 FrameUART   FrameReceived;
 uint8_t     RxData[20];
@@ -99,7 +101,7 @@ int main(void)
     Xval=Buffer[0];
     Yval=Buffer[1];
     HAL_Delay(50);
-
+    SendAccelFrame(Xval,Yval);
 
    }
   /* USER CODE END 3 */
@@ -219,6 +221,18 @@ void ExecuteReceivedFrameCallback(FrameUART *frame)
 
 
 }
+#define COMMAND_ACCEL   0xA1     /* STM32 → PC: accelero frame   */
+
+
+void SendAccelFrame(int16_t x_mg, int16_t y_mg)
+{
+    FrameUART f;
+    f.cmd    = COMMAND_ACCEL;
+    f.config = 0x0000;
+    /* Pack: DATA[31:16] = Xval,  DATA[15:0] = Yval  (both as uint16) */
+    f.data   = ((uint32_t)(uint16_t)x_mg << 16) | ((uint32_t)(uint16_t)y_mg & 0xFFFF);
+    SendFrame(&f);
+}
 
 uint8_t SendFrame(FrameUART *frame )
 {
@@ -235,7 +249,7 @@ uint8_t SendFrame(FrameUART *frame )
 	Txbuffer[6]=(uint8_t)(frame->data>>16);
 	Txbuffer[7]=(uint8_t)(frame->data>>24);
 
-    HAL_UART_Transmit_IT(&huart2,Txbuffer,8);
+    HAL_UART_Transmit(&huart2,Txbuffer,8,100);
 
 	return err;
 
